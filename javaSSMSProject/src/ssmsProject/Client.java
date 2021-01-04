@@ -16,11 +16,11 @@ public class Client {
         try {
             sk = new Socket("localhost", 50000);
             run = new RunProtocol(sk);
-            // Define mensagem e valor inicial
-            // limitado ao valor 124 (pois valor maximo positivo de 1 byte
-            // com sinal é 127 (124+3)
-            // prot.setMensagem("Teste simples de mensagem...");
-            // prot.setValor(17);
+            prot.setOrigem((short) 0);
+            prot.setDestino((short) 26598);
+            prot.setAlgoritmo((byte) 0);
+            prot.setPadding((byte) 1);
+            prot.setModo((byte) 0);
 
             System.out.println("Executando protocolo ...");
             // Chama o método que roda o protocolo do tipo ProtocolModel
