@@ -2,6 +2,7 @@ package ssmsProject;
 
 import protocols.ProtocolModel;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.util.HashMap;
 
 public class ProtocolSSMS extends ProtocolModel {
@@ -11,9 +12,13 @@ public class ProtocolSSMS extends ProtocolModel {
     private byte algoritmo;
     private byte padding;
     private byte modo;
+    private boolean errorMsg = false;
+    private SecureSuite secureSuite;
+    private byte[] iv;
 
     ProtocolSSMS(int mode) {
         super(mode, 4);
+        secureSuite = new SecureSuite((int)algoritmo, (int)modo, (int)padding);
     }
 
     protected byte[] nextMessage() {
@@ -46,18 +51,8 @@ public class ProtocolSSMS extends ProtocolModel {
 
         }
 //        @Override
-//        public int getPayloadLenght ( byte[] header){
-//            return 0;
-//        }
-//
-//        @Override
 //        protected byte[] nextMessage () {
 //            return new byte[0];
-//        }
-//
-//        @Override
-//        protected boolean verifyMessage ( byte[] receivedMsg){
-//            return false;
 //        }
     }
 
@@ -68,12 +63,91 @@ public class ProtocolSSMS extends ProtocolModel {
         // do cabeçalho e payload para leitura pelo RunProtocol
         //System.out.println("STEP: " + this.getStep());
         switch (this.getStep()) {
-            case 0: ret = 1;break;
-            case 1: ret = 1;break;
-            case 2: ret = 2;break;
-            case 3: ret = 1;break;
+            case 0: ret = 7;break; // mensagem par_req
+            case 1: ret = 17;break; // mensagem par_conf
+            case 2: ret = 3;break; // mensagem dados
+            case 3: ret = 1;break; // mensagem de conf
         }
         return ret;
+    }
+
+    /* Informa ao RunProtocol qual o tamanho do payload.
+    *  Neste protocolo, o tamanho é zero para as duas primeiras mensagens
+    *  e é informado pelo header na terceira mensagem */
+    @Override
+    public int getPayloadLenght ( byte[] header){
+        int ret = 0;
+        // precisa reconhecer o tipo da mensagem e saber o tamanho
+        // do cabeçalho e payload
+
+        switch (this.getStep()) {
+            case 0: ret = 0;break;
+            case 1: ret = 0;break;
+            case 2:
+                byte[] tamanhoMensagem = new byte[2];
+                System.arraycopy(header, 1, tamanhoMensagem, 0, 2);
+                ret = convertByteArrayToInt(tamanhoMensagem);
+                //System.out.println("Header: "+header[1]);
+                break;
+            case 3: ret = 0;break;
+        }
+        return ret;
+    }
+
+    protected boolean verifyMessage(byte[] receivedMsg) {
+        boolean ret = false;
+        switch (this.step) {
+            case 0:
+                //Verify First message, performed by the SERVER
+                ret = this.verifyParReq(receivedMsg);
+                System.out.println("Primeira Msg ... " + ret);
+                break;
+            case 1:
+                //Verify Second message, performed by the CLIENT
+                ret = this.verifyParConf(receivedMsg);
+                System.out.println("Segunda Msg ... " + ret);
+                break;
+            case 2:
+                //Verify Third message, performed by the SERVER
+                ret = this.verifyThirdMessage(receivedMsg);
+                System.out.println("Terceira Msg ... " + ret);
+                break;
+            case 3:
+                //Verify Third message, performed by the SERVER
+                ret = this.verifyForthMessage(receivedMsg);
+                System.out.println("Terceira Msg ... " + ret);
+                break;
+        }
+
+        return ret;
+    }
+
+    /* Método para verificar a primeira mensagem recebida pelo SERVER (par_req) */
+    private boolean verifyParReq(byte[] receivedMsg) {
+        // 1a mensagem sempre correta
+        boolean ret = true;
+        // atualização do status do protocolo, para o caso de enviar mensagem de erro
+        this.errorMsg = false;
+        // atualiza o estado das informações recebidas
+        byte alg_padding = receivedMsg[5];
+
+        int[] camposAlgPadding = convertBytetoTwoInts(alg_padding);
+        this.modo = receivedMsg[6];
+
+        secureSuite.setAlg(camposAlgPadding[0]);
+        secureSuite.setMode((int)modo);
+        secureSuite.setPad(camposAlgPadding[1]);
+
+        return ret;
+    }
+
+    private boolean verifyParConf(byte[] receivedMsg) {
+        boolean ret = true;
+        // Ler o tipo e o codigo de erro do cabeçado (1 byte)
+        // Verificar qual é o código de erro correspondente
+            // Caso o código = 0 (não houve erro)
+            // Senão (montar switch para imprimir mensagem de erro correta)
+        // retornar receiveMsg
     }
 
     private byte[] genParReq() {
@@ -158,17 +232,36 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     private byte[] genParConf() {
-        /*
-        * ESPECIFICAÇÃO PAR_CONF
-        * TIPO = 1
-        * CÓDIGO DE ERRO = Número de 0 a 6
-        * VETOR DE INICIALIZAÇÃO = (nenhum ou o correto para o alg suportado)
-        */
-
-        /* Pseudo-código */
-        // Declarar os valores especificados
-        // Copiar os valores acima para o vetor de bytes parConf
-        byte [] parConf = new byte[17];
+        byte[] parConf = new byte[17];
+        byte tipo_erro = 0b00010000;
+        // Verificar qual o algoritmo, modo e padding solicitados pelo cliente
+        // Se o SERVER suportar essa solicitacao:
+            // cria IV
+            // armazena tipo + IV no vetor de byte parConf
+        // Senão:
+            // informar codigo de erro
+        int algoritmo = secureSuite.getAlg();
+        int modo = secureSuite.getMode();
+        int padding = secureSuite.getPad();
+        if (secureSuite.algMap.containsKey(algoritmo) && secureSuite.modeMap.containsKey(modo) &&
+                secureSuite.padMap.containsKey(padding) ) {
+            switch (algoritmo) {
+                case 1: // aes 128
+                case 2: // aes 192
+                case 3: // aes 256
+                    this.iv = ivGenerator(16);
+                    break;
+                case 4: // 3des
+                case 5: // 3des-ede3
+                    this.iv = ivGenerator(8);
+                    break;
+            }
+        } else {
+            tipo_erro = 0b00010001; // codigo de erro = 1
+            System.out.println("Erro de parâmetros em genParConf");
+        }
+        parConf[0] = tipo_erro;
+        System.arraycopy(iv, 0, parConf, 1, 16);
         return parConf;
     }
 
@@ -220,6 +313,40 @@ public class ProtocolSSMS extends ProtocolModel {
 
     public void setModo(byte modo){
         this.modo = modo;
+    }
+
+    private int convertByteArrayToInt(byte[] intBytes){
+        ByteBuffer byteBuffer = ByteBuffer.wrap(intBytes);
+        return byteBuffer.getInt();
+    }
+
+    /* Método recebe 1 byte do cabeçalho (campos do algoritmo e padding, cada um com  4 bits),
+     transforma em bit e converte para inteiro */
+    private int[] convertBytetoTwoInts(byte header) {
+        byte[] eightBits = new byte[8]; // armazena 1 bit do header em cada posicao
+        int[] alg_padding = new int[2]; // armazena o valor do algoritmo na posicao 0 e o valor do padding na posicao 1
+
+        int i = 0;
+        while(i < 8) { // lê 1 bit do header por vez e o armazena em eightBits
+            eightBits[i] = (byte) ((header >> i) & 1);
+            i++;
+        }
+        byte[] fourBytes = new byte[4];
+
+        System.arraycopy(eightBits, 0, fourBytes, 0, 4);
+        alg_padding[0] = convertByteArrayToInt(fourBytes); // correspode ao valor do algoritmo
+
+        System.arraycopy(eightBits, 4, fourBytes, 0, 4);
+        alg_padding[1] = convertByteArrayToInt(fourBytes); // corresponde ao valor do padding
+
+        return alg_padding;
+    }
+
+    private byte[] ivGenerator(int tamanho) {
+        byte[] iv = new byte[tamanho];
+        SecureRandom srandom = new SecureRandom();
+        srandom.nextBytes(iv);
+        return iv;
     }
 }
 

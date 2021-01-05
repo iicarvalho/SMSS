@@ -18,13 +18,12 @@ public class SecureSuite {
     private int pad;
     public static final HashMap<Integer,String> algMap = new HashMap<Integer,String>();
     {
-        algMap.put(0,"AES");
-        algMap.put(1,"AES");
-        algMap.put(2,"AES");
-        algMap.put(3,"DES");
-        algMap.put(4,"3DES-EDE2");
-        algMap.put(5,"3DES-EDE3");
-        algMap.put(6,"RC4");
+        algMap.put(0,"AES"); // 128 bits
+        algMap.put(1,"AES"); // 192 bits
+        algMap.put(2,"AES"); // 256 bits
+        algMap.put(3,"DES"); // 64 bits
+        algMap.put(4,"3DES-EDE2"); // 64 bits
+        algMap.put(5,"3DES-EDE3"); // 64 bits
     };
     public static final HashMap<Integer,String> modeMap = new HashMap<Integer,String>();
     {
