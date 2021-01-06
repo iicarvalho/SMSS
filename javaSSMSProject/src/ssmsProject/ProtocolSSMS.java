@@ -7,8 +7,8 @@ import java.util.HashMap;
 
 public class ProtocolSSMS extends ProtocolModel {
 
-    private short origem;
-    private short destino;
+    private short origem=0;
+    private short destino=0;
     private byte algoritmo;
     private byte padding;
     private byte modo;
@@ -50,6 +50,7 @@ public class ProtocolSSMS extends ProtocolModel {
                 break;
 
         }
+        return msg;
 //        @Override
 //        protected byte[] nextMessage () {
 //            return new byte[0];
@@ -122,6 +123,14 @@ public class ProtocolSSMS extends ProtocolModel {
         return ret;
     }
 
+    private boolean verifyThirdMessage(byte[] receivedMsg) {
+        return true;
+    }
+
+    private boolean verifyForthMessage(byte[] receivedMsg) {
+        return true;
+    }
+
     /* Método para verificar a primeira mensagem recebida pelo SERVER (par_req) */
     private boolean verifyParReq(byte[] receivedMsg) {
         // 1a mensagem sempre correta
@@ -148,18 +157,21 @@ public class ProtocolSSMS extends ProtocolModel {
             // Caso o código = 0 (não houve erro)
             // Senão (montar switch para imprimir mensagem de erro correta)
         // retornar receiveMsg
+        return ret;
     }
 
     private byte[] genParReq() {
+        System.out.println("Executando genParReq");
         /* ORIGEM E DESTINO */
         /* Os valores de origem e destino possuem tamanho de 2 bytes,
          *  por isso, precisam ser alocados em um array de bytes */
         ByteBuffer origemByte = ByteBuffer.allocate(2);
-        origemByte.putInt(origem);
+        origemByte.putShort(origem);
         byte[] origemArray = origemByte.array();
-
+        System.out.println("Buffer de origem ok");
         ByteBuffer destinoByte = ByteBuffer.allocate(2);
-        destinoByte.putInt(destino);
+        destinoByte.putShort(destino);
+        System.out.println("Buffer de destino ok");
         byte[] destinoArray = destinoByte.array();
 
         /** TIPO **/
@@ -240,21 +252,34 @@ public class ProtocolSSMS extends ProtocolModel {
             // armazena tipo + IV no vetor de byte parConf
         // Senão:
             // informar codigo de erro
+        System.out.println("Pegando informaçoes do secureSuite");
         int algoritmo = secureSuite.getAlg();
         int modo = secureSuite.getMode();
         int padding = secureSuite.getPad();
+
+        /**************** HARD CODING**************************/
+        algoritmo = 0;
+        modo = 0;
+        padding = 0;
+
         if (secureSuite.algMap.containsKey(algoritmo) && secureSuite.modeMap.containsKey(modo) &&
                 secureSuite.padMap.containsKey(padding) ) {
+            System.out.println("Valor do algoritmo:" + algoritmo);
             switch (algoritmo) {
-                case 1: // aes 128
-                case 2: // aes 192
-                case 3: // aes 256
+                case 0: // aes 128
+                case 1: // aes 192
+                case 2: // aes 256
+                    System.out.println("IvGenerator com block size = 16");
                     this.iv = ivGenerator(16);
                     break;
+                case 3: // des
                 case 4: // 3des
                 case 5: // 3des-ede3
+                    System.out.println("IvGenerator com block size = 8");
                     this.iv = ivGenerator(8);
                     break;
+                default:
+                    System.out.println("Case incorreto");
             }
         } else {
             tipo_erro = 0b00010001; // codigo de erro = 1
@@ -276,8 +301,8 @@ public class ProtocolSSMS extends ProtocolModel {
         /* Pseudo-código */
         // Declarar os valores especificados
         // Copiar os valores acima para o vetor de bytes dados (calcular tamanho)
-        byte[] dados = new byte[];
-        return dados;
+        byte[] bytes = new byte[10];
+        return bytes;
     }
 
     private byte[] genConf() {
@@ -316,8 +341,8 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     private int convertByteArrayToInt(byte[] intBytes){
-        ByteBuffer byteBuffer = ByteBuffer.wrap(intBytes);
-        return byteBuffer.getInt();
+        System.out.println("Int Bytes valor:" + intBytes);
+        return ByteBuffer.wrap(intBytes).getShort();
     }
 
     /* Método recebe 1 byte do cabeçalho (campos do algoritmo e padding, cada um com  4 bits),
