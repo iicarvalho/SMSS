@@ -2,6 +2,7 @@ package ssmsProject;
 
 import protocols.ProtocolModel;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.HashMap;
 
@@ -15,6 +16,7 @@ public class ProtocolSSMS extends ProtocolModel {
     private boolean errorMsg = false;
     private SecureSuite secureSuite;
     private byte[] iv;
+    private String mensagem;
 
     ProtocolSSMS(int mode) {
         super(mode, 4);
@@ -51,10 +53,6 @@ public class ProtocolSSMS extends ProtocolModel {
 
         }
         return msg;
-//        @Override
-//        protected byte[] nextMessage () {
-//            return new byte[0];
-//        }
     }
 
     @Override
@@ -152,12 +150,18 @@ public class ProtocolSSMS extends ProtocolModel {
 
     private boolean verifyParConf(byte[] receivedMsg) {
         boolean ret = true;
-        // Ler o tipo e o codigo de erro do cabeçado (1 byte)
-        // Verificar qual é o código de erro correspondente
-            // Caso o código = 0 (não houve erro)
-            // Senão (montar switch para imprimir mensagem de erro correta)
-        // retornar receiveMsg
-        return ret;
+        // Ler o tipo e o codigo de erro do cabeçalho (1 byte)
+        int[] tipo_codigo = new int[2];
+        tipo_codigo = convertBytetoTwoInts(receivedMsg[0]);
+
+        if (tipo_codigo[1] == 0) { // não houve erro, armazena IV
+            System.out.println("Armazenando IV");
+            System.arraycopy(receivedMsg, 1, iv, 0, 16);
+        } else {
+            verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
+        }
+
+        return ret; // retornar receiveMsg
     }
 
     private byte[] genParReq() {
@@ -291,18 +295,24 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     private byte[] genDadosMsg() {
-        /*
-         * ESPECIFICAÇÃO DADOS
-         * TIPO = 2
-         * TAMANHO DOS DADOS = Número em bytes
-         * DADOS = (MÁX DE 1140 BYTES)
-         */
 
-        /* Pseudo-código */
-        // Declarar os valores especificados
-        // Copiar os valores acima para o vetor de bytes dados (calcular tamanho)
-        byte[] bytes = new byte[10];
-        return bytes;
+        byte tipo_codErro = 0b00100000; // tipo = 2 e codigo de erro
+
+        int tamanho = mensagem.length(); // tamanho
+        ByteBuffer tamanhoByte = ByteBuffer.allocate(4);
+        tamanhoByte.putInt(origem);
+        byte[] tamanhoByteArray = tamanhoByte.array();
+        System.out.println("Tamnho da mensagem ok");
+
+        byte[] msg = mensagem.getBytes(StandardCharsets.UTF_8); // mensagem (dados)
+
+        // Constroi mensagem de dados (tipo, codErro, tamanho e mensagem)
+        byte[] dados = new byte[3+tamanho];
+        dados[0] = tipo_codErro;
+        System.arraycopy(tamanhoByteArray, 0, dados, 1, 2); // passa o campo tamanho
+        System.arraycopy(msg, 0, dados, 3, msg.length); // passa o campo de dados
+
+        return dados;
     }
 
     private byte[] genConf() {
@@ -340,16 +350,22 @@ public class ProtocolSSMS extends ProtocolModel {
         this.modo = modo;
     }
 
+    public void setMensagem(String mensagem) {
+        this.mensagem = mensagem;
+    }
+
     private int convertByteArrayToInt(byte[] intBytes){
         System.out.println("Int Bytes valor:" + intBytes);
         return ByteBuffer.wrap(intBytes).getShort();
     }
 
-    /* Método recebe 1 byte do cabeçalho (campos do algoritmo e padding, cada um com  4 bits),
-     transforma em bit e converte para inteiro */
+    /* Método recebe 1 byte do cabeçalho (dois campos com 4 bits),
+     faz a leitura bit a bit e converte os dois campos em inteiro
+     Retorna o primeiro e o segundo campos do cabeçalho na primeira e
+     segunda posições do vetor field1_field2 respectivamente */
     private int[] convertBytetoTwoInts(byte header) {
         byte[] eightBits = new byte[8]; // armazena 1 bit do header em cada posicao
-        int[] alg_padding = new int[2]; // armazena o valor do algoritmo na posicao 0 e o valor do padding na posicao 1
+        int[] field1_field2 = new int[2]; // armazena o valor do algoritmo na posicao 0 e o valor do padding na posicao 1
 
         int i = 0;
         while(i < 8) { // lê 1 bit do header por vez e o armazena em eightBits
@@ -359,12 +375,12 @@ public class ProtocolSSMS extends ProtocolModel {
         byte[] fourBytes = new byte[4];
 
         System.arraycopy(eightBits, 0, fourBytes, 0, 4);
-        alg_padding[0] = convertByteArrayToInt(fourBytes); // correspode ao valor do algoritmo
+        field1_field2[0] = convertByteArrayToInt(fourBytes); // correspode ao valor do algoritmo
 
         System.arraycopy(eightBits, 4, fourBytes, 0, 4);
-        alg_padding[1] = convertByteArrayToInt(fourBytes); // corresponde ao valor do padding
+        field1_field2[1] = convertByteArrayToInt(fourBytes); // corresponde ao valor do padding
 
-        return alg_padding;
+        return field1_field2;
     }
 
     private byte[] ivGenerator(int tamanho) {
@@ -372,6 +388,31 @@ public class ProtocolSSMS extends ProtocolModel {
         SecureRandom srandom = new SecureRandom();
         srandom.nextBytes(iv);
         return iv;
+    }
+
+    private void verifyError(int codigoErro) {
+        String errorMsg = null;
+        switch (codigoErro) {
+            case 1:
+                errorMsg = "Parâmetros não suportados";
+                break;
+            case 2:
+                errorMsg = "Erro interno não definido";
+                break;
+            case 3:
+                errorMsg = "Não há chave compartilhada";
+                break;
+            case 4:
+                errorMsg = "TIpo de mensagem inesperado";
+                break;
+            case 5:
+                errorMsg = "Vetor de inicialização nulo";
+                break;
+            case 6:
+                errorMsg = "Falha nos blocos de dados cifrados";
+                break;
+        }
+        throw new RuntimeException(errorMsg);
     }
 }
 

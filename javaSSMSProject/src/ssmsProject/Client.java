@@ -21,6 +21,7 @@ public class Client {
             prot.setAlgoritmo((byte) 0);
             prot.setPadding((byte) 1);
             prot.setModo((byte) 0);
+            prot.setMensagem("Teste simples de mensagem...");
 
             System.out.println("Executando protocolo ...");
             // Chama o método que roda o protocolo do tipo ProtocolModel
