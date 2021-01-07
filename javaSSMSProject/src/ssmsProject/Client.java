@@ -99,9 +99,15 @@ public class Client {
                     System.out.println("Padding inválido!");
                 }
             }
+<<<<<<< HEAD
 
             System.out.print("Mensagem: ");
             prot.setMensagem(input.next());
+=======
+            input.nextLine();
+            System.out.println("Mensagem: ");
+            prot.setMensagem(input.nextLine());
+>>>>>>> Adiciona método que retorna o valor dos campos Tipo e Código de erro em bytes
 
 //            prot.setAlgoritmo((byte) 0);
 //            prot.setPadding((byte) 0);
