@@ -1,9 +1,19 @@
 package ssmsProject;
 
 import protocols.ProtocolModel;
+
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.HashMap;
 
 public class ProtocolSSMS extends ProtocolModel {
@@ -17,6 +27,7 @@ public class ProtocolSSMS extends ProtocolModel {
     private SecureSuite secureSuite;
     private byte[] iv;
     private String mensagem;
+    private String chavePadrao = "chave 1 de teste";
 
     ProtocolSSMS(int mode) {
         super(mode, 4);
@@ -93,7 +104,7 @@ public class ProtocolSSMS extends ProtocolModel {
         return ret;
     }
 
-    protected boolean verifyMessage(byte[] receivedMsg) {
+    protected boolean verifyMessage(byte[] receivedMsg) throws Exception {
         boolean ret = false;
         switch (this.step) {
             case 0:
@@ -112,8 +123,8 @@ public class ProtocolSSMS extends ProtocolModel {
                 System.out.println("Terceira Msg ... " + ret);
                 break;
             case 3:
-                //Verify Third message, performed by the SERVER
-                ret = this.verifyForthMessage(receivedMsg);
+                //Verify Forth message, performed by the CLIENT
+                ret = this.verifyConf(receivedMsg);
                 System.out.println("Terceira Msg ... " + ret);
                 break;
         }
@@ -125,12 +136,28 @@ public class ProtocolSSMS extends ProtocolModel {
         return true;
     }
 
-    private boolean verifyForthMessage(byte[] receivedMsg) {
+    private boolean verifyConf(byte[] receivedMsg) throws Exception {
+        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
+
+        verifyMsgType(tipo_codErro[0], 4);
+
+        if (tipo_codErro[1] == 0) {
+            System.out.println("Dados recebidos com sucesso.");
+        } else {
+            verifyError(tipo_codErro[1]);
+        }
+
         return true;
     }
 
+    private void verifyMsgType(int type, int correctType) throws Exception {
+        if(type != correctType) {
+            throw new Exception("O tipo recebido foi " + type + ", mas o tipo esperado era " + correctType);
+        }
+    }
+
     /* Método para verificar a primeira mensagem recebida pelo SERVER (par_req) */
-    private boolean verifyParReq(byte[] receivedMsg) {
+    private boolean verifyParReq(byte[] receivedMsg) throws Exception {
         // 1a mensagem sempre correta
         boolean ret = true;
         // atualização do status do protocolo, para o caso de enviar mensagem de erro
@@ -145,10 +172,13 @@ public class ProtocolSSMS extends ProtocolModel {
         secureSuite.setMode((int)modo);
         secureSuite.setPad(camposAlgPadding[1]);
 
+        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
+        verifyMsgType(tipo_codErro[0], 0);
+
         return ret;
     }
 
-    private boolean verifyParConf(byte[] receivedMsg) {
+    private boolean verifyParConf(byte[] receivedMsg) throws Exception {
         boolean ret = true;
         // Ler o tipo e o codigo de erro do cabeçalho (1 byte)
         int[] tipo_codigo = new int[2];
@@ -160,6 +190,9 @@ public class ProtocolSSMS extends ProtocolModel {
         } else {
             verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
         }
+
+        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
+        verifyMsgType(tipo_codErro[0], 1);
 
         return ret; // retornar receiveMsg
     }
@@ -304,7 +337,11 @@ public class ProtocolSSMS extends ProtocolModel {
         byte[] tamanhoByteArray = tamanhoByte.array();
         System.out.println("Tamnho da mensagem ok");
 
-        byte[] msg = mensagem.getBytes(StandardCharsets.UTF_8); // mensagem (dados)
+        // Criptografa mensagem
+        String strCipher = secureSuite.toString();
+        String alg = secureSuite.getTextAlg();
+        String encryptMsg = encrypt(chavePadrao, mensagem, strCipher, alg, iv);
+        byte[] msg = encryptMsg.getBytes(StandardCharsets.UTF_8); // mensagem criptografada em bytes
 
         // Constroi mensagem de dados (tipo, codErro, tamanho e mensagem)
         byte[] dados = new byte[3+tamanho];
@@ -372,6 +409,7 @@ public class ProtocolSSMS extends ProtocolModel {
             eightBits[i] = (byte) ((header >> i) & 1);
             i++;
         }
+
         byte[] fourBytes = new byte[4];
 
         System.arraycopy(eightBits, 0, fourBytes, 0, 4);
@@ -414,6 +452,28 @@ public class ProtocolSSMS extends ProtocolModel {
         }
         throw new RuntimeException(errorMsg);
     }
+
+    /* Métodos de criptografia */
+    public static String encrypt(String chave, String value, String strCipher, String alg, byte[] iv) {
+
+        try {
+            IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+            SecretKeySpec skeySpec = new SecretKeySpec(chave.getBytes(StandardCharsets.UTF_8), alg);
+
+            Cipher cipher = Cipher.getInstance(strCipher);
+            cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivParameterSpec);
+
+            byte[] encrypted = cipher.doFinal(value.getBytes());
+            System.out.println("Encrypt:" + Base64.getEncoder().encodeToString(encrypted));
+            return Base64.getEncoder().encodeToString(encrypted);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
 }
+
+// throws UnsupportedEncodingException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException
 
 

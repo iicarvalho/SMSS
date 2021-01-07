@@ -47,7 +47,7 @@ public interface Protocol {
      *@param message The received message.
      *@return True if a valid message was received or false otherwise.
      */
-    public boolean setMessage(byte[] message);
+    public boolean setMessage(byte[] message) throws Exception;
 
     public void jumpStep();
 

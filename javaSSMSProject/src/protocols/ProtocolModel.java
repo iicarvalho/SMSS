@@ -142,7 +142,7 @@ public abstract class ProtocolModel implements Protocol {
      *@param message The received message (not base64 encoded).
      *@return True if a valid message was received or false otherwise.
      */
-    public boolean setMessage(byte[] message) {
+    public boolean setMessage(byte[] message) throws Exception {
 
         if (stepSeq.get(this.step) == RECEIVE_STEP) {
             if (this.verifyMessage(message)) {
@@ -248,7 +248,7 @@ public abstract class ProtocolModel implements Protocol {
      *@param receivedMsg The message received by Socket to be processed.
      *@return True if the message was correctly received and it is a valid message.
      */
-    protected abstract boolean verifyMessage(byte[] receivedMsg);
+    protected abstract boolean verifyMessage(byte[] receivedMsg) throws Exception;
 
     public void jumpStep() {
         this.step++;

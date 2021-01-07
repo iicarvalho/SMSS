@@ -53,7 +53,7 @@ public class RunProtocol {
      * @throws java.net.SocketException If there is an error in the underlying protocol, such as a TCP error.
      * @throws java.net.SocketTimeoutException If the socket timeout is reached.
      */
-    public boolean runProtocol(Protocol protocol) throws IOException, SocketException, SocketTimeoutException {
+    public boolean runProtocol(Protocol protocol) throws Exception {
         OutputStream outputStream = skt.getOutputStream();
         InputStream inputStream = skt.getInputStream();
         byte[] msg = null;
