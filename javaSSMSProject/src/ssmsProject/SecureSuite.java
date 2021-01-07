@@ -25,6 +25,7 @@ public class SecureSuite {
         algMap.put(4,"3DES-EDE2"); // 64 bits
         algMap.put(5,"3DES-EDE3"); // 64 bits
     };
+
     public static final HashMap<Integer,String> modeMap = new HashMap<Integer,String>();
     {
         modeMap.put(0,"ECB");
@@ -35,10 +36,27 @@ public class SecureSuite {
         modeMap.put(5,"CFB128");
         modeMap.put(6,"CTR");
     };
+
+
     public static final HashMap<Integer,String> padMap = new HashMap<Integer,String>();
     {
         padMap.put(0,"NoPadding");
         padMap.put(1,"PKCS5Padding");
+    };
+
+    public static final HashMap<Integer,String> algMapMenu = new HashMap<Integer,String>();
+    {
+        algMapMenu.put(0,"AES128"); // 128 bits
+    };
+
+    public static final HashMap<Integer,String> modeMapMenu = new HashMap<Integer,String>();
+    {
+        modeMapMenu.put(5,"CFB128");
+    };
+
+    public static final HashMap<Integer,String> padMapMenu = new HashMap<Integer,String>();
+    {
+        padMapMenu.put(0,"NoPadding");
     };
 
     SecureSuite(int algoritmo, int modo, int padding){
