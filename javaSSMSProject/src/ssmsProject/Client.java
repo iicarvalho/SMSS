@@ -19,8 +19,8 @@ public class Client {
             prot.setOrigem((short) 0);
             prot.setDestino((short) 26598);
             prot.setAlgoritmo((byte) 0);
-            prot.setPadding((byte) 1);
-            prot.setModo((byte) 0);
+            prot.setPadding((byte) 0);
+            prot.setModo((byte) 5);
             prot.setMensagem("Teste simples de mensagem...");
 
             System.out.println("Executando protocolo ...");
