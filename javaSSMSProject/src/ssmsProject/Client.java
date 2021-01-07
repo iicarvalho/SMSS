@@ -3,9 +3,12 @@ package ssmsProject;
 import protocols.RunProtocol;
 
 import java.net.Socket;
+import java.util.Scanner;
 
 public class Client {
     public static void main(String[] args) {
+        int algoritmo, modo, padding;
+        String mensagem;
         // Instancia protocolo no modo cliente
         ProtocolSSMS prot= new ProtocolSSMS(ProtocolSSMS.CLIENT);
         // Referencia para socket TCP
@@ -13,15 +16,72 @@ public class Client {
         // Referencia para executor do protocolo implementado com ProtocolModel
         RunProtocol run = null;
 
+        Scanner input = new Scanner(System.in);
+        SecureSuite ss = new SecureSuite(0,0,0);
+
+
         try {
             sk = new Socket("localhost", 50000);
             run = new RunProtocol(sk);
+
             prot.setOrigem((short) 0);
             prot.setDestino((short) 26598);
-            prot.setAlgoritmo((byte) 0);
-            prot.setPadding((byte) 0);
-            prot.setModo((byte) 5);
-            prot.setMensagem("Teste simples de mensagem...");
+
+            System.out.println("Algoritmos de criptografia disponíveis: ");
+            ss.algMapMenu.entrySet().forEach(entry->{
+                System.out.println(entry.getKey() + " = " + entry.getValue());
+            });
+
+            while(true){
+                System.out.print("Número do algoritmo: ");
+                algoritmo = input.nextInt();
+                if(ss.algMapMenu.containsKey(algoritmo)) {
+                    prot.setAlgoritmo((byte) algoritmo);
+                    break;
+                }else{
+                    System.out.println("Algoritmo inválido!");
+                }
+            }
+
+            System.out.println("Modos disponíveis: ");
+            ss.modeMapMenu.entrySet().forEach(entry->{
+                System.out.println(entry.getKey() + " = " + entry.getValue());
+            });
+
+            while(true){
+                System.out.print("Número do modo: ");
+                modo = input.nextInt();
+                if(ss.modeMapMenu.containsKey(modo)) {
+                    prot.setModo((byte) modo);
+                    break;
+                }else{
+                    System.out.println("Modo inválido!");
+                }
+            }
+
+            System.out.println("Tipos de padding disponíveis: ");
+            ss.padMapMenu.entrySet().forEach(entry->{
+                System.out.println(entry.getKey() + " = " + entry.getValue());
+            });
+
+            while(true){
+                System.out.print("Número do padding: ");
+                padding = input.nextInt();
+                if(ss.padMapMenu.containsKey(padding)) {
+                    prot.setPadding((byte) padding);
+                    break;
+                }else{
+                    System.out.println("Padding inválido!");
+                }
+            }
+
+            System.out.println("Mensagem: ");
+            prot.setMensagem(input.next());
+
+//            prot.setAlgoritmo((byte) 0);
+//            prot.setPadding((byte) 0);
+//            prot.setModo((byte) 5);
+//            prot.setMensagem("Teste simples de mensagem...");
 
             System.out.println("Executando protocolo ...");
             // Chama o método que roda o protocolo do tipo ProtocolModel
