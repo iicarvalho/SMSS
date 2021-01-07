@@ -44,20 +44,6 @@ public class SecureSuite {
         padMap.put(1,"PKCS5Padding");
     };
 
-    public static final HashMap<Integer,String> algMapMenu = new HashMap<Integer,String>();
-    {
-        algMapMenu.put(0,"AES128"); // 128 bits
-    };
-
-    public static final HashMap<Integer,String> modeMapMenu = new HashMap<Integer,String>();
-    {
-        modeMapMenu.put(5,"CFB128");
-    };
-
-    public static final HashMap<Integer,String> padMapMenu = new HashMap<Integer,String>();
-    {
-        padMapMenu.put(0,"NoPadding");
-    };
 
     SecureSuite(int algoritmo, int modo, int padding){
         this.alg = algoritmo;
