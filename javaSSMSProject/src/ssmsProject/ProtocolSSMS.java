@@ -13,6 +13,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 
@@ -134,28 +135,39 @@ public class ProtocolSSMS extends ProtocolModel {
 
     private boolean verifyData(byte[] receivedMsg) throws Exception {
 
-        //tam msg
-        //dados
-
         // Ler o tipo e o codigo de erro do cabeçalho (1 byte)
-        int[] tipo_codigo = new int[2];
+        int[] tipo_codigo;
         tipo_codigo = convertBytetoTwoInts(receivedMsg[0]);
 
+        // Verifica campo do código de erro
         if (tipo_codigo[1] == 0) { // não houve erro, armazena IV
             System.out.println("Mensagem criptografada pelo cliente...");
         } else {
             verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
         }
 
-        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
+        // Verifica tipo da mensagem
+        verifyMsgType(tipo_codigo[0], 2);
 
-        verifyMsgType(tipo_codErro[0], 2);
-
+        // Le o tamanho da mensagem
         byte [] tamanho = new byte[2];
-
         System.arraycopy(receivedMsg, 1, tamanho, 0, 2);
+        int msgSize = convertByteArrayToInt(tamanho);
+        System.out.println("Tamanho da mensagem criptografada recebida no Server: " + msgSize);
 
-        //int  = convertByteArrayToInt(tamanho);
+        // Le o campo com os dados (mensagem criptografada)
+        byte[] encryptMsg = new byte[msgSize];
+        System.arraycopy(receivedMsg, 3, encryptMsg, 0, msgSize);
+
+        // Descriptografa a mensagem
+        byte[] decryptMsg = decrypt(this.chavePadrao, encryptMsg, secureSuite.toString(), secureSuite.getTextAlg(), this.iv);
+        if (decryptMsg == null) {
+            System.out.println("O método de descriptografar retornou null");
+        }
+
+        String mensagemDescripto  = new String(decryptMsg, StandardCharsets.UTF_8);
+        System.out.println("Mensagem DESCRIPTOGRAFADA no SERVER: " + mensagemDescripto);
+
 
         return true; // retornar receiveMsg
 
@@ -198,8 +210,8 @@ public class ProtocolSSMS extends ProtocolModel {
         secureSuite.setMode((int)this.modo);
         secureSuite.setPad(camposAlgPadding[1]);
 
-        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
-        verifyMsgType(tipo_codErro[0], 0);
+        int[] tipo_reservado = convertBytetoTwoInts(receivedMsg[0]);
+        verifyMsgType(tipo_reservado[0], 0);
 
         return ret;
     }
@@ -344,14 +356,15 @@ public class ProtocolSSMS extends ProtocolModel {
                     this.iv = ivGenerator(8);
                     break;
                 default:
-                    System.out.println("Case incorreto");
+                    tipo_erro = 0b00010001;
+                    System.out.println("O algoritmo escolhido não é suportado.");
             }
         } else {
             tipo_erro = 0b00010001; // codigo de erro = 1
             System.out.println("Erro de parâmetros em genParConf");
         }
         parConf[0] = tipo_erro;
-        System.arraycopy(iv, 0, parConf, 1, 16);
+        System.arraycopy(iv, 0, parConf, 1, 16); // coloca o IV na mensagem a ser enviada
         return parConf;
     }
 
@@ -359,37 +372,29 @@ public class ProtocolSSMS extends ProtocolModel {
 
         byte tipo_codErro = 0b00100000; // tipo = 2 e codigo de erro
 
-
-        ByteBuffer tamanhoByte = ByteBuffer.allocate(4);
-        tamanhoByte.putInt(origem);
-        byte[] tamanhoByteArray = tamanhoByte.array();
-        System.out.println("Tamnho da mensagem ok");
-
         // Criptografa mensagem
         String strCipher = secureSuite.toString();
         String alg = secureSuite.getTextAlg();
-        String encryptMsg = encrypt(chavePadrao, mensagem, strCipher, alg, iv);
-        int tamanho = encryptMsg.length(); // tamanho
-        byte[] msg = encryptMsg.getBytes(); // mensagem criptografada em bytes
+        byte[] mensagemBytes = this.mensagem.getBytes(StandardCharsets.UTF_8);
+        
+        byte[] mensagemCripto = encrypt(chavePadrao, mensagemBytes, strCipher, alg, iv); // mensagem criptografada
+
+        // Define o vetor que irá no campo 'tamanho' da mensagem enviada
+        ByteBuffer tamanhoByte = ByteBuffer.allocate(2);
+        tamanhoByte.putShort((short) mensagemCripto.length);
+        byte[] tamanhoByteArray = tamanhoByte.array();
 
         // Constroi mensagem de dados (tipo, codErro, tamanho e mensagem)
-        byte[] dados = new byte[3+tamanho];
+        byte[] dados = new byte[3+mensagemCripto.length];
         dados[0] = tipo_codErro;
-        System.arraycopy(tamanhoByteArray, 0, dados, 1, 2); // passa o campo tamanho
-        System.out.println(msg);
-        System.out.println(msg.length);
-        System.arraycopy(msg, 0, dados, 3, msg.length); // passa o campo de dados
-        System.out.println("MODO (genDadosmsg:" + this.modo);
+        System.arraycopy(tamanhoByteArray, 0, dados, 1, tamanhoByteArray.length); // passa o campo tamanho
+
+        System.arraycopy(mensagemCripto, 0, dados, 3, mensagemCripto.length); // passa o campo de dados
+
         return dados;
     }
 
     private byte[] genConf() {
-        /*
-         * ESPECIFICAÇÃO DADOS
-         * TIPO = 4
-         * CÓDIGO DE ERRO = de 0 a 6
-         */
-
         /* Pseudo-código */
         // Declarar os valores especificados
 
@@ -490,7 +495,7 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     /* Métodos de criptografia */
-    public static String encrypt(String chave, String value, String strCipher, String alg, byte[] iv) {
+    public static byte[] encrypt(String chave, byte[] value, String strCipher, String alg, byte[] iv) {
         try {
             IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
             SecretKeySpec skeySpec = new SecretKeySpec(chave.getBytes(StandardCharsets.UTF_8), alg);
@@ -498,13 +503,26 @@ public class ProtocolSSMS extends ProtocolModel {
             Cipher cipher = Cipher.getInstance(strCipher);
             cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivParameterSpec);
 
-            byte[] encrypted = cipher.doFinal(value.getBytes());
-            System.out.println("Encrypt:" + Base64.getEncoder().encodeToString(encrypted));
-            return Base64.getEncoder().encodeToString(encrypted);
+            return cipher.doFinal(value);
         } catch(Exception e) {
             e.printStackTrace();
         }
 
+        return null;
+    }
+
+    public static byte[] decrypt(String chave, byte[] value, String strCipher, String alg, byte[] iv) {
+        try {
+            IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+            SecretKeySpec skeySpec = new SecretKeySpec(chave.getBytes(StandardCharsets.UTF_8), alg);
+
+            Cipher cipher = Cipher.getInstance(strCipher);
+            cipher.init(Cipher.DECRYPT_MODE, skeySpec, ivParameterSpec);
+
+            return cipher.doFinal(value);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
         return null;
     }
 }
