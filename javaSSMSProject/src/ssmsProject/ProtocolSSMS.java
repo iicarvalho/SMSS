@@ -119,7 +119,7 @@ public class ProtocolSSMS extends ProtocolModel {
                 break;
             case 2:
                 //Verify Third message, performed by the SERVER
-                ret = this.verifyThirdMessage(receivedMsg);
+                ret = this.verifyData(receivedMsg);
                 System.out.println("Terceira Msg ... " + ret);
                 break;
             case 3:
@@ -132,8 +132,33 @@ public class ProtocolSSMS extends ProtocolModel {
         return ret;
     }
 
-    private boolean verifyThirdMessage(byte[] receivedMsg) {
-        return true;
+    private boolean verifyData(byte[] receivedMsg) throws Exception {
+
+        //tam msg
+        //dados
+
+        // Ler o tipo e o codigo de erro do cabeçalho (1 byte)
+        int[] tipo_codigo = new int[2];
+        tipo_codigo = convertBytetoTwoInts(receivedMsg[0]);
+
+        if (tipo_codigo[1] == 0) { // não houve erro, armazena IV
+            System.out.println("Mensagem criptografada pelo cliente...");
+        } else {
+            verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
+        }
+
+        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
+
+        verifyMsgType(tipo_codErro[0], 2);
+
+        byte [] tamanho = new byte[2];
+
+        System.arraycopy(receivedMsg, 1, tamanho, 0, 2);
+
+        //int  = convertByteArrayToInt(tamanho);
+
+        return true; // retornar receiveMsg
+
     }
 
     private boolean verifyConf(byte[] receivedMsg) throws Exception {
@@ -167,9 +192,10 @@ public class ProtocolSSMS extends ProtocolModel {
 
         int[] camposAlgPadding = convertBytetoTwoInts(alg_padding);
         this.modo = receivedMsg[6];
+        System.out.println("VALOR DO MODO" + this.modo);
 
         secureSuite.setAlg(camposAlgPadding[0]);
-        secureSuite.setMode((int)modo);
+        secureSuite.setMode((int)this.modo);
         secureSuite.setPad(camposAlgPadding[1]);
 
         int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
@@ -180,12 +206,15 @@ public class ProtocolSSMS extends ProtocolModel {
 
     private boolean verifyParConf(byte[] receivedMsg) throws Exception {
         boolean ret = true;
+
         // Ler o tipo e o codigo de erro do cabeçalho (1 byte)
         int[] tipo_codigo = new int[2];
         tipo_codigo = convertBytetoTwoInts(receivedMsg[0]);
 
         if (tipo_codigo[1] == 0) { // não houve erro, armazena IV
             System.out.println("Armazenando IV");
+            iv = new byte[16];
+            System.out.println("iv :" + iv);
             System.arraycopy(receivedMsg, 1, iv, 0, 16);
         } else {
             verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
@@ -198,6 +227,9 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     private byte[] genParReq() {
+        secureSuite.setPad(this.padding);
+        secureSuite.setAlg(this.algoritmo);
+        secureSuite.setMode(this.modo);
         System.out.println("Executando genParReq");
         /* ORIGEM E DESTINO */
         /* Os valores de origem e destino possuem tamanho de 2 bytes,
@@ -290,15 +322,11 @@ public class ProtocolSSMS extends ProtocolModel {
         // Senão:
             // informar codigo de erro
         System.out.println("Pegando informaçoes do secureSuite");
+
         int algoritmo = secureSuite.getAlg();
         int modo = secureSuite.getMode();
         int padding = secureSuite.getPad();
-
-        /**************** HARD CODING**************************/
-        algoritmo = 0;
-        modo = 0;
-        padding = 0;
-
+        System.out.println("MODO:" + modo);
         if (secureSuite.algMap.containsKey(algoritmo) && secureSuite.modeMap.containsKey(modo) &&
                 secureSuite.padMap.containsKey(padding) ) {
             System.out.println("Valor do algoritmo:" + algoritmo);
@@ -331,7 +359,7 @@ public class ProtocolSSMS extends ProtocolModel {
 
         byte tipo_codErro = 0b00100000; // tipo = 2 e codigo de erro
 
-        int tamanho = mensagem.length(); // tamanho
+
         ByteBuffer tamanhoByte = ByteBuffer.allocate(4);
         tamanhoByte.putInt(origem);
         byte[] tamanhoByteArray = tamanhoByte.array();
@@ -341,14 +369,17 @@ public class ProtocolSSMS extends ProtocolModel {
         String strCipher = secureSuite.toString();
         String alg = secureSuite.getTextAlg();
         String encryptMsg = encrypt(chavePadrao, mensagem, strCipher, alg, iv);
-        byte[] msg = encryptMsg.getBytes(StandardCharsets.UTF_8); // mensagem criptografada em bytes
+        int tamanho = encryptMsg.length(); // tamanho
+        byte[] msg = encryptMsg.getBytes(); // mensagem criptografada em bytes
 
         // Constroi mensagem de dados (tipo, codErro, tamanho e mensagem)
         byte[] dados = new byte[3+tamanho];
         dados[0] = tipo_codErro;
         System.arraycopy(tamanhoByteArray, 0, dados, 1, 2); // passa o campo tamanho
+        System.out.println(msg);
+        System.out.println(msg.length);
         System.arraycopy(msg, 0, dados, 3, msg.length); // passa o campo de dados
-
+        System.out.println("MODO (genDadosmsg:" + this.modo);
         return dados;
     }
 
@@ -361,6 +392,7 @@ public class ProtocolSSMS extends ProtocolModel {
 
         /* Pseudo-código */
         // Declarar os valores especificados
+
         // Copiar os valores acima para o vetor de bytes conf
         byte[] conf = new byte[1];
         return conf;
@@ -400,25 +432,29 @@ public class ProtocolSSMS extends ProtocolModel {
      faz a leitura bit a bit e converte os dois campos em inteiro
      Retorna o primeiro e o segundo campos do cabeçalho na primeira e
      segunda posições do vetor field1_field2 respectivamente */
-    private int[] convertBytetoTwoInts(byte header) {
-        byte[] eightBits = new byte[8]; // armazena 1 bit do header em cada posicao
-        int[] field1_field2 = new int[2]; // armazena o valor do algoritmo na posicao 0 e o valor do padding na posicao 1
-
-        int i = 0;
-        while(i < 8) { // lê 1 bit do header por vez e o armazena em eightBits
-            eightBits[i] = (byte) ((header >> i) & 1);
-            i++;
+    private int convertBitStringToInt(String tipo){
+        int mult = 8;
+        int charValue;
+        int campoValue= 0;
+        char c;
+        for (int i=0; i< tipo.length(); i++){
+            c = tipo.charAt(i);
+            charValue = c - '0';
+            campoValue += (charValue * mult);
+            mult /= 2;
         }
+        return campoValue;
+    }
+    private int[] convertBytetoTwoInts(byte header) {
+        String headerString = String.format("%8s", Integer.toBinaryString(header & 0xFF)).replace(' ', '0');
 
-        byte[] fourBytes = new byte[4];
+        int field1 = convertBitStringToInt (headerString.substring(0, 4));
+        int field2 = convertBitStringToInt (headerString.substring(4, 8));
 
-        System.arraycopy(eightBits, 0, fourBytes, 0, 4);
-        field1_field2[0] = convertByteArrayToInt(fourBytes); // correspode ao valor do algoritmo
+        int [] array = {field1, field2};
 
-        System.arraycopy(eightBits, 4, fourBytes, 0, 4);
-        field1_field2[1] = convertByteArrayToInt(fourBytes); // corresponde ao valor do padding
+        return array;
 
-        return field1_field2;
     }
 
     private byte[] ivGenerator(int tamanho) {
@@ -455,11 +491,10 @@ public class ProtocolSSMS extends ProtocolModel {
 
     /* Métodos de criptografia */
     public static String encrypt(String chave, String value, String strCipher, String alg, byte[] iv) {
-
         try {
             IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
             SecretKeySpec skeySpec = new SecretKeySpec(chave.getBytes(StandardCharsets.UTF_8), alg);
-
+            System.out.println("String Cipher:" + strCipher);
             Cipher cipher = Cipher.getInstance(strCipher);
             cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivParameterSpec);
 
