@@ -3,20 +3,12 @@ package ssmsProject;
 import protocols.ProtocolModel;
 
 import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.HashMap;
-import java.util.Hashtable;
 
 public class ProtocolSSMS extends ProtocolModel {
 
@@ -144,7 +136,6 @@ public class ProtocolSSMS extends ProtocolModel {
                 byte[] tamanhoMensagem = new byte[2];
                 System.arraycopy(header, 1, tamanhoMensagem, 0, 2);
                 ret = convertByteArrayToInt(tamanhoMensagem);
-                //System.out.println("Header: "+header[1]);
                 break;
             case 3: ret = 0;break;
         }
@@ -186,10 +177,9 @@ public class ProtocolSSMS extends ProtocolModel {
         tipo_codigo = convertBytetoTwoInts(receivedMsg[0]);
 
         // Verifica campo do código de erro
-        if (tipo_codigo[1] == 0) { // não houve erro, armazena IV
-            System.out.println("Mensagem criptografada pelo cliente...");
-        } else {
-            verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
+        if (tipo_codigo[1] != 0) { // houve erro
+            this.codigoErro = String.valueOf(tipo_codigo[1]);
+            return verifyError(tipo_codigo[1]); // imprime mensagem de erro e retorna false
         }
 
         // Verifica tipo da mensagem
@@ -198,49 +188,53 @@ public class ProtocolSSMS extends ProtocolModel {
             return false;
         }
 
-
         // Le o tamanho da mensagem
         byte [] tamanho = new byte[2];
         System.arraycopy(receivedMsg, 1, tamanho, 0, 2);
         int msgSize = convertByteArrayToInt(tamanho);
-        System.out.println("Tamanho da mensagem criptografada recebida no Server: " + msgSize);
 
         // Le o campo com os dados (mensagem criptografada)
         byte[] encryptMsg = new byte[msgSize];
         System.arraycopy(receivedMsg, 3, encryptMsg, 0, msgSize);
 
+        byte[] decryptMsg = new byte[msgSize];
         // Descriptografa a mensagem
-        byte[] decryptMsg = decrypt(this.chavePadrao, encryptMsg, secureSuite.toString(), secureSuite.getTextAlg(), this.iv);
-        if (decryptMsg == null) {
-            this.codigoErro = "2";
-            System.out.println("Erro na execução da descriptografia");
+        try {
+            decryptMsg = decrypt(this.chavePadrao, encryptMsg, secureSuite.toString(), secureSuite.getTextAlg(), this.iv);
+            if (decryptMsg == null || decryptMsg.length == 1441) {
+                this.codigoErro = "6";
+                System.out.println("Erro na execução da descriptografia.");
+                return false;
+            }
+        } catch (Exception e) {
+            codigoErro = "6";
+            return false;
         }
-
         String mensagemDescripto  = new String(decryptMsg, StandardCharsets.UTF_8);
-        System.out.println("Mensagem DESCRIPTOGRAFADA no SERVER: " + mensagemDescripto);
+        System.out.println("Mensagem descriptografada no SERVER: " + mensagemDescripto);
 
-
-        return true; // retornar receiveMsg
+        return true;
     }
 
     private boolean verifyConf(byte[] receivedMsg) throws Exception {
-        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
+        boolean ret = true;
 
-        verifyMsgType(tipo_codErro[0], 4);
+        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
 
         if (tipo_codErro[1] == 0) {
             System.out.println("Dados recebidos com sucesso.");
         } else {
-            verifyError(tipo_codErro[1]);
+            this.codigoErro = String.valueOf(tipo_codErro[1]);
+            ret = verifyError(tipo_codErro[1]); // retorna false
         }
 
         // Verifica tipo da mensagem
         if (!verifyMsgType(tipo_codErro[0], 4)) { // tipo da mensagem diferente do esperado
             this.codigoErro = "4";
-            return false;
+            ret =  false;
         }
 
-        return true;
+        return ret;
     }
 
     private boolean verifyMsgType(int type, int correctType) {
@@ -250,7 +244,7 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     /* Método para verificar a primeira mensagem recebida pelo SERVER (par_req) */
-    private boolean verifyParReq(byte[] receivedMsg) throws Exception {
+    private boolean verifyParReq(byte[] receivedMsg) {
         // 1a mensagem sempre correta
         boolean ret = true;
 
@@ -259,11 +253,40 @@ public class ProtocolSSMS extends ProtocolModel {
 
         int[] camposAlgPadding = convertBytetoTwoInts(alg_padding);
         this.modo = receivedMsg[6];
-        System.out.println("VALOR DO MODO" + this.modo);
 
         secureSuite.setAlg(camposAlgPadding[0]); // armazena algoritmo escolhido
         secureSuite.setMode((int)this.modo); // armazena modo escolhido
         secureSuite.setPad(camposAlgPadding[1]); // armazena padding escolhido
+
+        if (secureSuite.algMap.containsKey(camposAlgPadding[0]) && secureSuite.modeMap.containsKey((int)this.modo) &&
+                secureSuite.padMap.containsKey(camposAlgPadding[1]) ) {
+            switch (algoritmo) {
+                case 0: // aes 128
+                case 1: // aes 192
+                case 2: // aes 256
+                    this.iv = ivGenerator(16);
+                    if(iv == null) {
+                        codigoErro = "5";
+                    }
+                    break;
+                case 3: // des
+                case 4: // 3des
+                case 5: // 3des-ede3
+                    this.iv = ivGenerator(8);
+                    if(iv == null) {
+                        codigoErro = "5";
+                    }
+                    break;
+                default:
+                    this.codigoErro = "1";
+                    System.out.println("O algoritmo escolhido não é suportado.");
+                    ret = false;
+            }
+        } else {
+            this.codigoErro = "1";
+            System.out.println("Os parâmetros de criptografia escolhidos não são suportados.");
+            ret = false;
+        }
 
         int[] tipo_reservado = convertBytetoTwoInts(receivedMsg[0]);
 
@@ -279,43 +302,43 @@ public class ProtocolSSMS extends ProtocolModel {
         boolean ret = true;
 
         // Ler o tipo e o codigo de erro do cabeçalho (1 byte)
-        int[] tipo_codigo = new int[2];
-        tipo_codigo = convertBytetoTwoInts(receivedMsg[0]);
+        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
 
-        if (tipo_codigo[1] == 0) { // não houve erro, armazena IV
-            System.out.println("Armazenando IV");
-            iv = new byte[16];
-            System.out.println("iv :" + iv);
-            System.arraycopy(receivedMsg, 1, iv, 0, 16);
+        if (tipo_codErro[1] == 0) { // não houve erro, armazena IV
+            if(secureSuite.getAlg() >= 3) {
+                iv = new byte[8];
+            } else {
+                iv = new byte[16];
+            }
+            System.arraycopy(receivedMsg, 1, iv, 0, iv.length);
         } else {
-            verifyError(tipo_codigo[1]); // imprime mensagem de erro e gera exception
+            this.codigoErro = String.valueOf(tipo_codErro[1]);
+            ret = verifyError(tipo_codErro[1]); // imprime mensagem de erro e gera false
         }
 
-        int[] tipo_codErro = convertBytetoTwoInts(receivedMsg[0]);
         if(!verifyMsgType(tipo_codErro[0], 1)) { // tipo da mensagem diferente do esperado
             this.codigoErro = "4";
             ret = false;
         }
 
-
-        return ret; // retornar receiveMsg
+        return ret; // retorna verdadeiro caso os campos estejam corretos
     }
 
     private byte[] genParReq() {
         secureSuite.setPad(this.padding);
         secureSuite.setAlg(this.algoritmo);
         secureSuite.setMode(this.modo);
-        System.out.println("Executando genParReq");
+        
         /* ORIGEM E DESTINO */
         /* Os valores de origem e destino possuem tamanho de 2 bytes,
          *  por isso, precisam ser alocados em um array de bytes */
         ByteBuffer origemByte = ByteBuffer.allocate(2);
         origemByte.putShort(origem);
         byte[] origemArray = origemByte.array();
-        System.out.println("Buffer de origem ok");
+        
         ByteBuffer destinoByte = ByteBuffer.allocate(2);
         destinoByte.putShort(destino);
-        System.out.println("Buffer de destino ok");
+        
         byte[] destinoArray = destinoByte.array();
 
         /** TIPO **/
@@ -389,44 +412,11 @@ public class ProtocolSSMS extends ProtocolModel {
 
     private byte[] genParConf() {
         byte[] parConf = new byte[17];
-        byte tipo_erro = getTypeErrorFieldByte("1" + codigoErro); // tipo = 1 e codigo = 0
+        byte tipo_erro = getTypeErrorFieldByte("1" + codigoErro); // tipo = 1 e codigo de erro (verifyParReq)
 
-        System.out.println("Pegando informaçoes do secureSuite");
-
-        // Le as informacoes de algoritmo, modo e padding que estao salvas na classe SecureSuite
-        // de acordo com o solicitado pelo CLIENT
-        int algoritmo = secureSuite.getAlg();
-        int modo = secureSuite.getMode();
-        int padding = secureSuite.getPad();
-        System.out.println("MODO:" + modo);
-        if (secureSuite.algMap.containsKey(algoritmo) && secureSuite.modeMap.containsKey(modo) &&
-                secureSuite.padMap.containsKey(padding) ) {
-            System.out.println("Valor do algoritmo:" + algoritmo);
-            switch (algoritmo) {
-                case 0: // aes 128
-                case 1: // aes 192
-                case 2: // aes 256
-                    System.out.println("IvGenerator com block size = 16");
-                    this.iv = ivGenerator(16);
-                    break;
-                case 3: // des
-                case 4: // 3des
-                case 5: // 3des-ede3
-                    System.out.println("IvGenerator com block size = 8");
-                    this.iv = ivGenerator(8);
-                    break;
-                default:
-                    this.codigoErro = "1";
-                    tipo_erro = getTypeErrorFieldByte("1" + codigoErro); // tipo = 1 e codigo de erro = 1
-                    System.out.println("O algoritmo escolhido não é suportado.");
-            }
-        } else {
-            this.codigoErro = "1";
-            tipo_erro = getTypeErrorFieldByte("1" + codigoErro); // tipo = 1 e codigo de erro = 1
-            System.out.println("Os parâmetros de criptografia escolhidos não são suportados.");
-        }
         parConf[0] = tipo_erro;
-        System.arraycopy(iv, 0, parConf, 1, 16); // coloca o IV na mensagem a ser enviada
+        System.arraycopy(iv, 0, parConf, 1, iv.length); // coloca o IV na mensagem a ser enviada
+
         return parConf;
     }
 
@@ -438,8 +428,12 @@ public class ProtocolSSMS extends ProtocolModel {
         String strCipher = secureSuite.toString();
         String alg = secureSuite.getTextAlg();
         byte[] mensagemBytes = this.mensagem.getBytes(StandardCharsets.UTF_8);
-        
-        byte[] mensagemCripto = encrypt(chavePadrao, mensagemBytes, strCipher, alg, iv); // mensagem criptografada
+        byte[] mensagemCripto = new byte[mensagem.length()];
+        try {
+            mensagemCripto = encrypt(chavePadrao, mensagemBytes, strCipher, alg, iv); // mensagem criptografada
+        } catch (Exception e) {
+            codigoErro = "2";
+        }
 
         // Define o vetor que irá no campo 'tamanho' da mensagem enviada
         ByteBuffer tamanhoByte = ByteBuffer.allocate(2);
@@ -450,7 +444,6 @@ public class ProtocolSSMS extends ProtocolModel {
         byte[] dados = new byte[3+mensagemCripto.length];
         dados[0] = tipo_codErro;
         System.arraycopy(tamanhoByteArray, 0, dados, 1, tamanhoByteArray.length); // passa o campo tamanho
-
         System.arraycopy(mensagemCripto, 0, dados, 3, mensagemCripto.length); // passa o campo de dados
 
         return dados;
@@ -489,7 +482,6 @@ public class ProtocolSSMS extends ProtocolModel {
     }
 
     private int convertByteArrayToInt(byte[] intBytes){
-        System.out.println("Int Bytes valor:" + intBytes);
         return ByteBuffer.wrap(intBytes).getShort();
     }
 
@@ -529,7 +521,7 @@ public class ProtocolSSMS extends ProtocolModel {
         return iv;
     }
 
-    private void verifyError(int codigoErro) {
+    private boolean verifyError(int codigoErro) {
         String errorMsg = null;
         switch (codigoErro) {
             case 1:
@@ -542,7 +534,7 @@ public class ProtocolSSMS extends ProtocolModel {
                 errorMsg = "Não há chave compartilhada";
                 break;
             case 4:
-                errorMsg = "TIpo de mensagem inesperado";
+                errorMsg = "Tipo de mensagem inesperado";
                 break;
             case 5:
                 errorMsg = "Vetor de inicialização nulo";
@@ -551,7 +543,8 @@ public class ProtocolSSMS extends ProtocolModel {
                 errorMsg = "Falha nos blocos de dados cifrados";
                 break;
         }
-        throw new RuntimeException(errorMsg);
+        System.out.println(errorMsg);
+        return false;
     }
 
     private byte getTypeErrorFieldByte(String fieldsValue) {
@@ -563,16 +556,14 @@ public class ProtocolSSMS extends ProtocolModel {
         try {
             IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
             SecretKeySpec skeySpec = new SecretKeySpec(chave.getBytes(StandardCharsets.UTF_8), alg);
-            System.out.println("String Cipher:" + strCipher);
+
             Cipher cipher = Cipher.getInstance(strCipher);
             cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivParameterSpec);
 
             return cipher.doFinal(value);
         } catch(Exception e) {
-            e.printStackTrace();
+            return e.toString().getBytes(StandardCharsets.UTF_8);
         }
-
-        return null;
     }
 
     public static byte[] decrypt(String chave, byte[] value, String strCipher, String alg, byte[] iv) {
@@ -585,9 +576,8 @@ public class ProtocolSSMS extends ProtocolModel {
 
             return cipher.doFinal(value);
         } catch(Exception e) {
-            e.printStackTrace();
+            return new byte[1441];
         }
-        return null;
     }
 }
 

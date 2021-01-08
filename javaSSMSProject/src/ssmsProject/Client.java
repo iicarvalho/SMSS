@@ -57,57 +57,51 @@ public class Client {
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             });
 
-            while(true){
+//            while(true){
                 System.out.print("Número do algoritmo: ");
                 algoritmo = input.nextInt();
-                if(c.algMapMenu.containsKey(algoritmo)) {
+//                if(c.algMapMenu.containsKey(algoritmo)) {
                     prot.setAlgoritmo((byte) algoritmo);
-                    break;
-                }else{
-                    System.out.println("Algoritmo inválido!");
-                }
-            }
+//                    break;
+//                }else{
+//                    System.out.println("Algoritmo inválido!");
+//                }
+//            }
 
             System.out.println("Modos disponíveis: ");
             c.modeMapMenu.entrySet().forEach(entry->{
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             });
 
-            while(true){
+//            while(true){
                 System.out.print("Número do modo: ");
                 modo = input.nextInt();
-                if(c.modeMapMenu.containsKey(modo)) {
+//                if(c.modeMapMenu.containsKey(modo)) {
                     prot.setModo((byte) modo);
-                    break;
-                }else{
-                    System.out.println("Modo inválido!");
-                }
-            }
+//                    break;
+//                }else{
+//                    System.out.println("Modo inválido!");
+//                }
+//            }
 
             System.out.println("Tipos de padding disponíveis: ");
             c.padMapMenu.entrySet().forEach(entry->{
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             });
 
-            while(true){
+//            while(true){
                 System.out.print("Número do padding: ");
                 padding = input.nextInt();
-                if(c.padMapMenu.containsKey(padding)) {
+//                if(c.padMapMenu.containsKey(padding)) {
                     prot.setPadding((byte) padding);
-                    break;
-                }else{
-                    System.out.println("Padding inválido!");
-                }
-            }
-<<<<<<< HEAD
-
-            System.out.print("Mensagem: ");
-            prot.setMensagem(input.next());
-=======
+//                    break;
+//                }else{
+//                    System.out.println("Padding inválido!");
+//                }
+//            }
             input.nextLine();
             System.out.println("Mensagem: ");
             prot.setMensagem(input.nextLine());
->>>>>>> Adiciona método que retorna o valor dos campos Tipo e Código de erro em bytes
 
 //            prot.setAlgoritmo((byte) 0);
 //            prot.setPadding((byte) 0);

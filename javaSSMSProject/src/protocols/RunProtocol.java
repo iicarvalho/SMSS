@@ -65,9 +65,7 @@ public class RunProtocol {
                     outputStream.write(msg);
                     outputStream.flush();
                     System.out.println("MESSAGE SENT ... ("+msg.length+")");
-                    //Util.viewHex(msg);
                 } else {
-                    //System.out.println("MESSAGE NOT SENT ... ABORT");
                     return false;
                 }
             } else if (protocol.nextStep() == Protocol.RECEIVE_STEP) {
@@ -77,14 +75,13 @@ public class RunProtocol {
                     throw ioe;
                 }
                 System.out.println("MESSAGE RECEIVED ... ("+msg.length+")");
-                //Util.viewHex(msg);
+
                 if (!protocol.setMessage(msg)) {
-                    //System.out.println("MESSAGE NOT ACCEPTED ... ABORT");
                     return false;
                 }
             } else if (protocol.nextStep() == Protocol.WAIT_STEP) {
                 protocol.jumpStep();
-                //Do nothing
+                // Do nothing
             } else {
                 return true;
             }
@@ -103,15 +100,12 @@ public class RunProtocol {
         int lenH = prot.getHeaderLenght();
         byte[] header = new byte[lenH];
 
-        //System.out.println("HEADER: " + lenH);
         in.read(header);
-        //Util.viewHex(header);
         lenP = prot.getPayloadLenght(header);
         byte[] payload = new byte[lenH+lenP];
         System.arraycopy(header, 0, payload, 0, lenH);
         in.read(payload, lenH, lenP);
-        //System.out.println("PAYLOAD: " + lenP);
-        //Util.viewHex(payload);
+
         return payload;
     }
 }
