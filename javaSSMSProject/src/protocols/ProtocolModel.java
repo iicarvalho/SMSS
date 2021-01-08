@@ -1,3 +1,8 @@
+/*
+ * Integrantes:
+ * Igor Inácio de Carvalho Silva - 725804
+ * Vitoria Rodrigues Silva - 726598
+ * */
 package protocols;
 import java.util.ArrayList;
 

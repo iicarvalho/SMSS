@@ -1,3 +1,8 @@
+/*
+* Integrantes:
+* Igor Inácio de Carvalho Silva - 725804
+* Vitoria Rodrigues Silva - 726598
+* */
 package ssmsProject;
 
 import protocols.RunProtocol;
@@ -60,63 +65,40 @@ public class Client {
 
             prot.setOrigem((short) 0);
             prot.setDestino((short) 26598);
-            System.out.println("teste: " + algMapMenu);
-            System.out.println("Algoritmos de criptografia disponíveis: ");
 
+            System.out.println("Algoritmos de criptografia disponíveis: ");
             c.algMapMenu.entrySet().forEach(entry->{
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             });
 
-//            while(true){
-                System.out.print("Número do algoritmo: ");
-                algoritmo = input.nextInt();
-//                if(c.algMapMenu.containsKey(algoritmo)) {
-                    prot.setAlgoritmo((byte) algoritmo);
-//                    break;
-//                }else{
-//                    System.out.println("Algoritmo inválido!");
-//                }
-//            }
+            System.out.print("Número do algoritmo: ");
+            algoritmo = input.nextInt();
+
+            prot.setAlgoritmo((byte) algoritmo);
 
             System.out.println("Modos disponíveis: ");
             c.modeMapMenu.entrySet().forEach(entry->{
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             });
 
-//            while(true){
-                System.out.print("Número do modo: ");
-                modo = input.nextInt();
-//                if(c.modeMapMenu.containsKey(modo)) {
-                    prot.setModo((byte) modo);
-//                    break;
-//                }else{
-//                    System.out.println("Modo inválido!");
-//                }
-//            }
+            System.out.print("Número do modo: ");
+            modo = input.nextInt();
+
+            prot.setModo((byte) modo);
 
             System.out.println("Tipos de padding disponíveis: ");
             c.padMapMenu.entrySet().forEach(entry->{
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             });
 
-//            while(true){
-                System.out.print("Número do padding: ");
-                padding = input.nextInt();
-//                if(c.padMapMenu.containsKey(padding)) {
-                    prot.setPadding((byte) padding);
-//                    break;
-//                }else{
-//                    System.out.println("Padding inválido!");
-//                }
-//            }
+            System.out.print("Número do padding: ");
+            padding = input.nextInt();
+
+            prot.setPadding((byte) padding);
+
             input.nextLine();
             System.out.println("Mensagem: ");
             prot.setMensagem(input.nextLine());
-
-//            prot.setAlgoritmo((byte) 0);
-//            prot.setPadding((byte) 0);
-//            prot.setModo((byte) 5);
-//            prot.setMensagem("Teste simples de mensagem...");
 
             System.out.println("Executando protocolo ...");
             // Chama o método que roda o protocolo do tipo ProtocolModel
