@@ -13,16 +13,26 @@ public class Client {
         algMapMenu.put(0,"AES128"); // 128 bits
         algMapMenu.put(1,"AES192"); // 192 bits
         algMapMenu.put(2,"AES256"); // 256 bits
+        algMapMenu.put(3,"DES"); // 64 bits
+        algMapMenu.put(4,"3DES-EDE2"); // 64 bits
+        algMapMenu.put(5,"3DES-EDE3"); // 64 bits
     };
 
     public static final HashMap<Integer,String> modeMapMenu = new HashMap<Integer,String>();
     {
+        modeMapMenu.put(0,"ECB");
+        modeMapMenu.put(1,"CBC");
+        modeMapMenu.put(2,"CFB1");
+        modeMapMenu.put(3,"CFB8");
+        modeMapMenu.put(4,"CFB64");
         modeMapMenu.put(5,"CFB128");
+        modeMapMenu.put(6,"CTR");
     };
 
     public static final HashMap<Integer,String> padMapMenu = new HashMap<Integer,String>();
     {
         padMapMenu.put(0,"NoPadding");
+        padMapMenu.put(1,"PKCS5Padding");
     };
 
     public static void main(String[] args) {
